@@ -43,12 +43,12 @@ class CheckFaceComRate {
 		foreach ($this->options as $option) {
 			$option = str_replace(':', '', $option);
 			if (empty($this->arguments[$option])) {
-				$this->quit(self::EXIT_UNKNOWN, 'option "'.$option.'" not set or empty');
+				$this->quit(self::EXIT_WARN, 'option "'.$option.'" not set or empty');
 			}
 		}
 
 		if (empty($this->arguments)) {
-			$this->quit(self::EXIT_UNKNOWN, 'error parsing options');
+			$this->quit(self::EXIT_WARN, 'error parsing options');
 		}
 	}
 
@@ -71,7 +71,7 @@ class CheckFaceComRate {
 		$rawData = curl_exec($curl);
 
 		if (CURLE_OK !== curl_errno($curl)) {
-			$this->quit(self::EXIT_UNKNOWN, 'curl error: '.curl_error($curl));
+			$this->quit(self::EXIT_WARN, 'curl error: '.curl_error($curl));
 		}
 
 		curl_close($curl);
@@ -110,25 +110,25 @@ class CheckFaceComRate {
 			if (isset($result['error_message'])) {
 				$message .= ': '.$result['error_message'];
 			}
-			$this->quit(self::EXIT_UNKNOWN, $message);
+			$this->quit(self::EXIT_WARN, $message);
 		}
 
 		// check required values
 		if (!isset($result['usage']['used']) || !is_int($result['usage']['used']) || 0 > $result['usage']['used']) {
 			$message .= ': invalid value "used"';
-			$this->quit(self::EXIT_UNKNOWN, $message);
+			$this->quit(self::EXIT_WARN, $message);
 		}
 		if (!isset($result['usage']['remaining']) || !is_int($result['usage']['remaining']) || 0 > $result['usage']['remaining']) {
 			$message .= ': invalid value "remaining"';
-			$this->quit(self::EXIT_UNKNOWN, $message);
+			$this->quit(self::EXIT_WARN, $message);
 		}
 		if (!isset($result['usage']['limit']) || !is_int($result['usage']['limit']) || 0 > $result['usage']['limit']) {
 			$message .= ': invalid value "limit"';
-			$this->quit(self::EXIT_UNKNOWN, $message);
+			$this->quit(self::EXIT_WARN, $message);
 		}
 		if (!isset($result['usage']['reset_time']) || !is_int($result['usage']['reset_time']) || $_SERVER['REQUEST_TIME'] - self::API_TIME_MAX_DIFF > $result['usage']['reset_time']) {
 			$message .= ': invalid value "reset_time"';
-			$this->quit(self::EXIT_UNKNOWN, $message);
+			$this->quit(self::EXIT_WARN, $message);
 		}
 	}
 
@@ -138,18 +138,13 @@ class CheckFaceComRate {
 	private function checkUsage(array $usage) {
 		$remainingSeconds = $usage['reset_time'] - $_SERVER['REQUEST_TIME'];
 		if ($remainingSeconds >= 3600) {
-			$remainingSeconds = 3600;
 			$averageUsage = 0;
 		}
 		else {
 			$averageUsage = round($usage['used'] / (3600 - $remainingSeconds), 2);
 		}
-		$ratePerSecond = $usage['limit'] / 3600;
 
-		if ($usage['remaining'] < (int)($remainingSeconds * $ratePerSecond)) {
-			$this->quit(self::EXIT_WARN, 'average usage exceeded, '.$usage['remaining'].' remaining', array('remaining' => $usage['remaining'], 'usage' => $averageUsage));
-		}
-		elseif ($usage['remaining'] <= (int)($usage['limit'] * $this->arguments['crit'] / 100)) {
+		if ($usage['remaining'] <= (int)($usage['limit'] * $this->arguments['crit'] / 100)) {
 			$this->quit(self::EXIT_CRIT, 'critical limit reached, '.$usage['remaining'].' remaining', array('remaining' => $usage['remaining'], 'usage' => $averageUsage));
 		}
 		else {
