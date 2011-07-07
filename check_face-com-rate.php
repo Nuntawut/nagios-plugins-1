@@ -15,6 +15,7 @@ class CheckFaceComRate {
 	const EXIT_CRIT = 2;
 	const EXIT_UNKNOWN = 3;
 
+	const API_ERROR_EXCEEDED = 202;
 	const API_SERVER = 'http://api.face.com/';
 	const API_TIMEOUT = 2;
 	const API_TIME_MAX_DIFF = 5;
@@ -105,12 +106,22 @@ class CheckFaceComRate {
 	private function validateResult(array $result) {
 		$message = 'face.com error';
 
-		// error response
+		// usage exceeded
+		if ('failure' === $result['status'] && isset($result['error_code']) && self::API_ERROR_EXCEEDED === $result['error_code']) {
+			$this->quit(self::EXIT_CRIT, 'limit exceeded, no requests left');
+		}
+
+		// misc error
 		if ('failure' === $result['status'] || !isset($result['usage'])) {
 			if (isset($result['error_message'])) {
 				$message .= ': '.$result['error_message'];
 			}
 			$this->quit(self::EXIT_WARN, $message);
+		}
+
+		// unlimited requests
+		if (isset($result['usage']['remaining']) && 'unlimited' === $result['usage']['remaining']) {
+			$this->quit(self::EXIT_OK, 'unlimited requests');
 		}
 
 		// check required values
@@ -145,10 +156,10 @@ class CheckFaceComRate {
 		}
 
 		if ($usage['remaining'] <= (int)($usage['limit'] * $this->arguments['crit'] / 100)) {
-			$this->quit(self::EXIT_CRIT, 'critical limit reached, '.$usage['remaining'].' remaining', array('remaining' => $usage['remaining'], 'usage' => $averageUsage));
+			$this->quit(self::EXIT_CRIT, 'critical limit reached, '.$usage['remaining'].' remaining', array('remaining' => $usage['remaining'], 'used' => $usage['used'], 'usage' => $averageUsage));
 		}
 		else {
-			$this->quit(self::EXIT_OK, 'all fine, '.$usage['remaining'].' remaining', array('remaining' => $usage['remaining'], 'usage' => $averageUsage));
+			$this->quit(self::EXIT_OK, 'all fine, '.$usage['remaining'].' remaining', array('remaining' => $usage['remaining'], 'used' => $usage['used'], 'usage' => $averageUsage));
 		}
 	}
 }
