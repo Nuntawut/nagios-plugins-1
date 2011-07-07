@@ -10,7 +10,7 @@ Options
 
 * key - face.com api key
 * secret - face.com api secret
-* crit - percentual crit limit
+* crit - percental crit limit
 
 Example
 
